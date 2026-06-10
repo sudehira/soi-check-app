@@ -400,6 +400,50 @@ function CheckForm({ soi, storeId, existing, onSave, onBack }) {
 }
 
 // ─────────────────────────────────────────────
+// Excel (CSV) Export
+// ─────────────────────────────────────────────
+function exportToCSV(records) {
+  const itemList = CHECKLIST.flatMap(c => c.items);
+
+  // Header row
+  const headers = [
+    "Date", "Store ID", "SOI", "Score(%)", "Answered", "Passed(O)", "Failed(X)",
+    ...itemList.map(i => `[${CHECKLIST.find(c => c.items.includes(i)).category}] ${i.text}`),
+    ...itemList.map(i => `Note: ${i.text.slice(0, 30)}`),
+  ];
+
+  // Data rows
+  const rows = records.map(rec => {
+    const sc = calcScore(rec.checks);
+    return [
+      rec.date,
+      rec.store_id,
+      rec.soi,
+      sc.pct,
+      sc.answered,
+      sc.passed,
+      sc.failed,
+      ...itemList.map(i => rec.checks?.[i.id] || ""),
+      ...itemList.map(i => rec.notes?.[i.id] || ""),
+    ];
+  });
+
+  const allRows = [headers, ...rows];
+  const bom = "﻿"; // UTF-8 BOM for Excel
+  const csv = bom + allRows.map(r =>
+    r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
+  ).join("\r\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `SOI_Check_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────
 // Dashboard
 // ─────────────────────────────────────────────
 function Dashboard({ records, loading, onRefresh, onBack }) {
@@ -442,10 +486,16 @@ function Dashboard({ records, loading, onRefresh, onBack }) {
             style={{ background: "none", border: "none", color: "#93C5FD", fontSize: 13, cursor: "pointer", padding: 0 }}>
             ← 戻る
           </button>
-          <button onClick={onRefresh}
-            style={{ background: "rgba(255,255,255,.12)", border: "none", color: "#fff", fontSize: 12, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
-            {loading ? "…" : "↻ 更新"}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => exportToCSV(filtered)}
+              style={{ background: "#16A34A", border: "none", color: "#fff", fontSize: 12, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
+              ⬇ Excel
+            </button>
+            <button onClick={onRefresh}
+              style={{ background: "rgba(255,255,255,.12)", border: "none", color: "#fff", fontSize: 12, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
+              {loading ? "…" : "↻ 更新"}
+            </button>
+          </div>
         </div>
         <div style={{ fontWeight: 800, fontSize: 18, marginTop: 8 }}>Dashboard</div>
         <div style={{ fontSize: 11, color: "#93C5FD" }}>リアルタイム集計 / Real-time summary</div>
